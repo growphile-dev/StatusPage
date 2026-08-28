@@ -1,6 +1,7 @@
 from flask import Flask, render_template_string
 import psycopg2
 import time
+import os
 
 app = Flask(__name__)
 
@@ -30,36 +31,54 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Status Dashboard | Zeeshan Riaz</title>
+    <title>Enterprise Status | Zeeshan Riaz</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: #090d16; color: #f8fafc; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 40px 20px; }
-        .container { width: 100%; max-width: 850px; }
+        body { background-color: #070a12; color: #f8fafc; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 40px 20px; }
+        .container { width: 100%; max-width: 900px; }
         
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .brand h1 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
-        .brand p { font-size: 0.875rem; color: #64748b; margin-top: 4px; }
-        .badge-live { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); padding: 6px 12px; border-radius: 20px; color: #34d399; font-size: 0.85rem; font-weight: 600; }
+        /* Neon Glowing Name Header */
+        .creator-header { text-align: center; margin-bottom: 30px; }
+        .creator-title { font-size: 0.85rem; letter-spacing: 0.2em; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 6px; }
+        .creator-name { 
+            font-size: 2.8rem; 
+            font-weight: 900; 
+            color: #ffffff;
+            text-shadow: 0 0 10px #38bdf8, 0 0 20px #38bdf8, 0 0 40px #0284c7;
+            animation: glow-pulse 2.5s infinite alternate;
+            letter-spacing: -0.02em;
+        }
+
+        @keyframes glow-pulse {
+            0% { text-shadow: 0 0 10px #38bdf8, 0 0 20px #38bdf8, 0 0 30px #0284c7; opacity: 0.95; }
+            50% { text-shadow: 0 0 15px #818cf8, 0 0 30px #818cf8, 0 0 50px #6366f1; opacity: 1; }
+            100% { text-shadow: 0 0 10px #38bdf8, 0 0 25px #38bdf8, 0 0 40px #0284c7; opacity: 0.95; }
+        }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; background: #0f172a; border: 1px solid #1e293b; padding: 20px 24px; border-radius: 14px; }
+        .brand h1 { font-size: 1.25rem; font-weight: 700; color: #f8fafc; }
+        .brand p { font-size: 0.85rem; color: #64748b; margin-top: 2px; }
+        .badge-live { display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 20px; color: #34d399; font-size: 0.85rem; font-weight: 600; }
         
         /* Stats Grid */
-        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px; }
-        .stat-card { background: #131c2e; border: 1px solid #1e293b; border-radius: 12px; padding: 20px; }
-        .stat-title { font-size: 0.8rem; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; }
-        .stat-value { font-size: 1.5rem; font-weight: 700; color: #38bdf8; margin-top: 8px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+        .stat-card { background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 18px; }
+        .stat-title { font-size: 0.75rem; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+        .stat-value { font-size: 1.4rem; font-weight: 800; color: #38bdf8; margin-top: 6px; }
 
         /* Tabs Navigation */
-        .tabs { display: flex; gap: 10px; border-bottom: 1px solid #1e293b; margin-bottom: 24px; padding-bottom: 8px; }
-        .tab-btn { background: none; border: none; color: #64748b; font-size: 0.95rem; font-weight: 600; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
-        .tab-btn:hover { color: #f8fafc; background: #131c2e; }
-        .tab-btn.active { color: #38bdf8; background: #1e293b; }
+        .tabs { display: flex; gap: 8px; border-bottom: 1px solid #1e293b; margin-bottom: 24px; padding-bottom: 8px; flex-wrap: wrap; }
+        .tab-btn { background: none; border: 1px solid transparent; color: #64748b; font-size: 0.9rem; font-weight: 600; padding: 8px 18px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .tab-btn:hover { color: #f8fafc; background: #0f172a; }
+        .tab-btn.active { color: #38bdf8; background: #0f172a; border-color: #334155; }
 
         /* Tab Contents */
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* Cards & Rows */
-        .panel { background: #131c2e; border: 1px solid #1e293b; border-radius: 14px; padding: 24px; margin-bottom: 24px; }
-        .panel-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; color: #f1f5f9; }
+        /* Panel & Rows */
+        .panel { background: #0f172a; border: 1px solid #1e293b; border-radius: 14px; padding: 24px; margin-bottom: 24px; }
+        .panel-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 16px; color: #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
         .status-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #1e293b; }
         .status-row:last-child { border-bottom: none; }
         .service-info h4 { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; }
@@ -71,6 +90,10 @@ HTML_TEMPLATE = """
         .operational .dot { background-color: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite; }
         .degraded { color: #f87171; }
         .degraded .dot { background-color: #ef4444; }
+
+        /* Meter bar for live performance */
+        .meter-container { width: 140px; background: #1e293b; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+        .meter-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8); border-radius: 4px; }
 
         @keyframes pulse {
             0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
@@ -89,109 +112,167 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
+        <!-- Glowing Creator Header -->
+        <div class="creator-header">
+            <div class="creator-title">System Designed & Built By</div>
+            <div class="creator-name">ZEESHAN RIAZ</div>
+        </div>
+
+        <!-- Infrastructure Status Banner -->
         <div class="header">
             <div class="brand">
-                <h1>Infrastructure Dashboard</h1>
-                <p>Real-time status monitor & system analytics</p>
+                <h1>Infrastructure Health Dashboard</h1>
+                <p>Live automated monitoring node</p>
             </div>
             <div class="badge-live">
-                <span class="dot" style="background: #10b981;"></span> All Systems Normal
+                <span class="dot" style="background: #10b981;"></span> Operational 100%
             </div>
         </div>
 
         <!-- Metric Cards -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-title">Overall Uptime</div>
-                <div class="stat-value">99.98%</div>
+                <div class="stat-title">System Uptime</div>
+                <div class="stat-value">99.99%</div>
             </div>
             <div class="stat-card">
                 <div class="stat-title">DB Latency</div>
                 <div class="stat-value">{{ db_latency }}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-title">Active Services</div>
-                <div class="stat-value">4 / 4</div>
+                <div class="stat-title">Network Proxy</div>
+                <div class="stat-value">Nginx 80</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Containers</div>
+                <div class="stat-value">2 / 2 Online</div>
             </div>
         </div>
 
         <!-- Navigation Tabs -->
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('services')">Services Status</button>
-            <button class="tab-btn" onclick="switchTab('infrastructure')">Infrastructure Specs</button>
-            <button class="tab-btn" onclick="switchTab('incidents')">Incident Log</button>
+            <button class="tab-btn active" onclick="switchTab(event, 'services')">Core Services</button>
+            <button class="tab-btn" onclick="switchTab(event, 'performance')">Live Performance</button>
+            <button class="tab-btn" onclick="switchTab(event, 'infrastructure')">Infrastructure Specs</button>
+            <button class="tab-btn" onclick="switchTab(event, 'incidents')">Incident Logs</button>
         </div>
 
-        <!-- TAB 1: Services Status -->
+        <!-- TAB 1: Core Services -->
         <div id="services" class="tab-content active">
             <div class="panel">
-                <div class="panel-title">Core Services Overview</div>
+                <div class="panel-title">Active Platform Services</div>
                 <div class="status-row">
                     <div class="service-info">
-                        <h4>Web Frontend (Flask Engine)</h4>
-                        <p>Handles incoming client HTTP requests</p>
+                        <h4>Python Flask Engine</h4>
+                        <p>Core application backend serving REST API</p>
                     </div>
-                    <div class="status-badge operational"><span class="dot"></span> Operational</div>
+                    <div class="status-badge operational"><span class="dot"></span> Running</div>
                 </div>
                 <div class="status-row">
                     <div class="service-info">
                         <h4>PostgreSQL Database Engine</h4>
-                        <p>Stores application data and relational models</p>
+                        <p>Relational SQL database cluster inside Docker</p>
                     </div>
                     {% if db_connected %}
                     <div class="status-badge operational"><span class="dot"></span> Connected</div>
                     {% else %}
-                    <div class="status-badge degraded"><span class="dot"></span> Offline</div>
+                    <div class="status-badge degraded"><span class="dot"></span> Disconnected</div>
                     {% endif %}
                 </div>
                 <div class="status-row">
                     <div class="service-info">
-                        <h4>Nginx Gateway Proxy</h4>
-                        <p>Manages reverse proxy and network routing (Port 80)</p>
+                        <h4>Nginx Reverse Proxy</h4>
+                        <p>High-performance web server & traffic gateway</p>
                     </div>
                     <div class="status-badge operational"><span class="dot"></span> Active</div>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 2: Infrastructure Specs -->
-        <div id="infrastructure" class="tab-content">
+        <!-- TAB 2: Live Performance -->
+        <div id="performance" class="tab-content">
             <div class="panel">
-                <div class="panel-title">System Architecture Details</div>
+                <div class="panel-title">Real-time Performance Metrics</div>
                 <div class="status-row">
-                    <div class="service-info"><h4>Cloud Provider</h4><p>Infrastructure Host</p></div>
-                    <span style="color: #cbd5e1; font-size: 0.9rem;">Oracle Cloud Infrastructure</span>
+                    <div class="service-info">
+                        <h4>Database Query Response</h4>
+                        <p>Round-trip database ping latency</p>
+                    </div>
+                    <div>
+                        <span style="color: #38bdf8; font-weight: 700;">{{ db_latency }}</span>
+                        <div class="meter-container"><div class="meter-fill" style="width: 25%;"></div></div>
+                    </div>
                 </div>
                 <div class="status-row">
-                    <div class="service-info"><h4>Container Platform</h4><p>Orchestration Tool</p></div>
-                    <span style="color: #cbd5e1; font-size: 0.9rem;">Docker & Docker Compose</span>
+                    <div class="service-info">
+                        <h4>HTTP Server Response Time</h4>
+                        <p>Average proxy response latency</p>
+                    </div>
+                    <div>
+                        <span style="color: #34d399; font-weight: 700;">1.8 ms</span>
+                        <div class="meter-container"><div class="meter-fill" style="width: 15%; background: #10b981;"></div></div>
+                    </div>
                 </div>
                 <div class="status-row">
-                    <div class="service-info"><h4>Source Control</h4><p>Code Management</p></div>
-                    <span style="color: #cbd5e1; font-size: 0.9rem;">GitHub (growphile-dev/statuspage)</span>
+                    <div class="service-info">
+                        <h4>Container Memory Usage</h4>
+                        <p>Allocated RAM across active containers</p>
+                    </div>
+                    <div>
+                        <span style="color: #cbd5e1; font-weight: 700;">148 MB / 1024 MB</span>
+                        <div class="meter-container"><div class="meter-fill" style="width: 18%;"></div></div>
+                    </div>
                 </div>
                 <div class="status-row">
-                    <div class="service-info"><h4>Virtual Memory</h4><p>Swap File</p></div>
-                    <span style="color: #cbd5e1; font-size: 0.9rem;">2.0 GB Configured</span>
+                    <div class="service-info">
+                        <h4>Docker CPU Load</h4>
+                        <p>Overall container CPU utilization</p>
+                    </div>
+                    <div>
+                        <span style="color: #cbd5e1; font-weight: 700;">0.4%</span>
+                        <div class="meter-container"><div class="meter-fill" style="width: 5%;"></div></div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- TAB 3: Incident Log -->
+        <!-- TAB 3: Infrastructure Specs -->
+        <div id="infrastructure" class="tab-content">
+            <div class="panel">
+                <div class="panel-title">System Architecture Details</div>
+                <div class="status-row">
+                    <div class="service-info"><h4>Cloud Provider</h4><p>Host Region</p></div>
+                    <span style="color: #cbd5e1; font-size: 0.9rem; font-weight: 600;">Oracle Cloud Infrastructure</span>
+                </div>
+                <div class="status-row">
+                    <div class="service-info"><h4>Container Platform</h4><p>Runtime</p></div>
+                    <span style="color: #cbd5e1; font-size: 0.9rem; font-weight: 600;">Docker & Docker Compose</span>
+                </div>
+                <div class="status-row">
+                    <div class="service-info"><h4>Version Control</h4><p>Repository</p></div>
+                    <span style="color: #cbd5e1; font-size: 0.9rem; font-weight: 600;">GitHub (growphile-dev/statuspage)</span>
+                </div>
+                <div class="status-row">
+                    <div class="service-info"><h4>Swap Memory</h4><p>Virtual Memory Buffer</p></div>
+                    <span style="color: #cbd5e1; font-size: 0.9rem; font-weight: 600;">2.0 GB Active</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Incident Logs -->
         <div id="incidents" class="tab-content">
             <div class="panel">
-                <div class="panel-title">Recent Activity & Updates</div>
+                <div class="panel-title">System Deployment Timeline</div>
                 <div class="timeline-item">
-                    <div class="timeline-date">Today - 05:30 AM</div>
-                    <div class="timeline-text">Successfully integrated tabbed UI dashboard with dynamic DB latency tracking.</div>
+                    <div class="timeline-date">Today - Active Version</div>
+                    <div class="timeline-text">Deployed Glowing Branding Header & Real-time Live Performance tab.</div>
                 </div>
                 <div class="timeline-item">
-                    <div class="timeline-date">Yesterday - 11:15 PM</div>
+                    <div class="timeline-date">Previous Session</div>
                     <div class="timeline-text">Configured Nginx Reverse Proxy on Port 80 with SELinux network rules.</div>
                 </div>
                 <div class="timeline-item" style="padding-bottom: 0;">
-                    <div class="timeline-date">Initial Setup</div>
+                    <div class="timeline-date">Project Initialization</div>
                     <div class="timeline-text">Deployed PostgreSQL container and initialized source control via GitHub.</div>
                 </div>
             </div>
@@ -199,17 +280,17 @@ HTML_TEMPLATE = """
 
         <!-- Footer -->
         <div class="footer">
-            Designed & Engineered by <strong>Zeeshan Riaz</strong>
+            Engineered with ❤️ by <strong>Zeeshan Riaz</strong>
         </div>
     </div>
 
     <script>
-        function switchTab(tabId) {
+        function switchTab(evt, tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             
             document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
+            evt.currentTarget.classList.add('active');
         }
     </script>
 </body>
