@@ -3,11 +3,18 @@ services:
     build: ./app
     ports:
       - "5001:5000"
+    restart: always
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=statuspage
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=SecurePass123!
     depends_on:
       - db
 
   db:
     image: postgres:15-alpine
+    restart: always
     environment:
       POSTGRES_USER: appuser
       POSTGRES_PASSWORD: "SecurePass123!"
